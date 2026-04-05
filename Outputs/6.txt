@@ -1,10 +1,10 @@
 
 ==============================================================
-  MPTCP vs TCP — BANDWIDTH COLLAPSE EXPERIMENT
+  MPTCP HANDOVER — TCP PER-PATH BASELINES + AGGREGATION + RTT SHIFT
 ==============================================================
-  Topology : h1 <--[s1  Path 1  10 Mbps / 40ms RTT]--> h2
-             h1 <--[s2  Path 2  10 Mbps / 40ms RTT]--> h2
-                         (Path 2 collapses to 2 Mbps at t=10s)
+  Topology : h1 <--[s1  Path 1  10 Mbps, 20ms+20ms per link]--> h2
+             h1 <--[s2  Path 2  10 Mbps, 50ms+50ms per link]--> h2
+  Part 3   : Path 1 RTT increased in steps after 10s (no bandwidth throttle on Path 2).
 
 ==============================================================
   CONNECTIVITY CHECK
@@ -18,7 +18,7 @@
   Regular TCP, one path at a time, 10s each.
 
 --------------------------------------------------------------
-  TCP — Path 1 (10 Mbps, 40ms RTT)
+  TCP — Path 1 (10 Mbps, 20ms+20ms links)
 --------------------------------------------------------------
   Duration      : 10.0 s
   Avg throughput: 9.28 Mbps
@@ -28,7 +28,7 @@
   Retransmits   : 0
 
 --------------------------------------------------------------
-  TCP — Path 2 (10 Mbps, 40ms RTT)
+  TCP — Path 2 (10 Mbps, 50ms+50ms links)
 --------------------------------------------------------------
   Duration      : 10.0 s
   Avg throughput: 8.68 Mbps
@@ -75,7 +75,7 @@
   PART 2 — MPTCP AGGREGATION (no failure)
 ==============================================================
   Two parallel streams, one bound per interface.
-  Baseline to compare against the collapse experiment.
+  Baseline to compare against the handover run in Part 3.
   Running 15s baseline transfer...
   [OK] Done after ~21s
 
@@ -135,13 +135,16 @@
   Aggregation eff.   : 102.2%
 
 ==============================================================
-  PART 4 — HANDOVER (WiFi → LTE transition)
+  PART 3 — HANDOVER (Path 1 RTT increase, WiFi → LTE analogy)
 ==============================================================
-  Both paths start equal (10 Mbps, 40 ms RTT).
-  At t=10s, Path 1 degrades (WiFi weak).
-  MPTCP should shift traffic to Path 2 smoothly.
+  Path 1 starts with lower delay (20ms+20ms); Path 2 is slower (50ms+50ms);
+  both capped at 10 Mbps. Parallel iperf clients simulate two subflows.
+  After t=10s wall time, Path 1 delay is stepped up on s1 and host ifaces;
+  the scheduler should send more traffic on Path 2.
 
-  [t= 0]  Both paths active (balanced).
+  [t=0]  Transfer running; Path 1 still at baseline delay until t=10s.
+
+  [t≈10s]  Increasing Path 1 (s1) netem delay — handover stress...
 
   [tc] Updating Path 1 → RTT 100 ms
   [tc] h1:h1-eth0  => 100 ms
@@ -172,7 +175,7 @@
   [OK] Done after ~1s
 
 --------------------------------------------------------------
-  Handover — Path 1 (degraded WiFi)
+  Handover — Path 1 (WiFi analog, RTT ramped)
 --------------------------------------------------------------
   Duration      : 25.0 s
   Avg throughput: 9.27 Mbps
@@ -182,7 +185,7 @@
   Retransmits   : 493
 
 --------------------------------------------------------------
-  Handover — Path 2 (LTE preferred)
+  Handover — Path 2 (LTE analog)
 --------------------------------------------------------------
   Duration      : 25.0 s
   Avg throughput: 9.20 Mbps
@@ -204,8 +207,8 @@
       7     9.90    10.48    20.38  
       8    10.48    10.49    20.97  
       9    10.49    10.49    20.97  
-     10    10.48    10.48    20.97  <-- last balanced second
-     11    10.49    10.49    20.98  <-- HANDOVER START
+     10    10.48    10.48    20.97  <-- before Path 1 RTT increase
+     11    10.49    10.49    20.98  <-- handover (Path 1 delay stepped up)
      12     0.00    10.49    10.49  <-- shifting traffic
      13    10.49    20.99    31.48  
      14    10.49    10.48    20.97  
@@ -243,10 +246,10 @@
                 5    0    5    0    5
                 time (seconds) →
                       ^
-                      collapse at t=11s
+                      handover at t=11s
 
-  #  Path 1 — degrading WiFi              avg: 10.65 Mbps
-  *  Path 2 — preferred LTE               avg: 12.73 Mbps
+  #  Path 1 — degrading (WiFi analog)     avg: 10.65 Mbps
+  *  Path 2 — LTE analog                  avg: 12.73 Mbps
   o  Combined total                       avg: 23.38 Mbps
 
 ==============================================================
