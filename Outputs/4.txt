@@ -1,0 +1,253 @@
+
+==============================================================
+  MPTCP vs TCP — BANDWIDTH COLLAPSE EXPERIMENT
+==============================================================
+  Topology : h1 <--[s1  Path 1  10 Mbps / 40ms RTT]--> h2
+             h1 <--[s2  Path 2  10 Mbps / 40ms RTT]--> h2
+                         (Path 2 collapses to 2 Mbps at t=10s)
+
+==============================================================
+  CONNECTIVITY CHECK
+==============================================================
+  ping 10.0.0.2  =>  [OK]    3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+  ping 10.0.1.2  =>  [OK]    3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+
+==============================================================
+  PART 1 — TCP BASELINE (each path independently)
+==============================================================
+  Regular TCP, one path at a time, 10s each.
+
+--------------------------------------------------------------
+  TCP — Path 1 (10 Mbps, 40ms RTT)
+--------------------------------------------------------------
+  Duration      : 10.0 s
+  Avg throughput: 9.28 Mbps
+  Peak          : 17.73 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 14.90 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  TCP — Path 2 (10 Mbps, 40ms RTT)
+--------------------------------------------------------------
+  Duration      : 10.0 s
+  Avg throughput: 9.28 Mbps
+  Peak          : 17.73 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 14.90 MB
+  Retransmits   : 0
+
+==============================================================
+  GRAPH — TCP baseline per path
+==============================================================
+
+    Mbps  |
+    17.7  |      *    
+    16.3  | *         
+    14.8  |    *      
+    13.3  |           
+    11.8  |   *       
+    10.3  |  *    ****
+     8.9  |           
+     7.4  |     *     
+     5.9  |           
+     4.4  |           
+     3.0  |           
+     1.5  |           
+     0.0  |           
+          +-----------
+                5    0
+                time (seconds) →
+
+  #  TCP Path 1 (10 Mbps cap)             avg: 11.92 Mbps
+  *  TCP Path 2 (10 Mbps cap)             avg: 11.92 Mbps
+
+--------------------------------------------------------------
+  TCP BASELINE SUMMARY
+--------------------------------------------------------------
+  Path 1 avg : 9.28 Mbps  (cap 10 Mbps)
+  Path 2 avg : 9.28 Mbps  (cap 10 Mbps)
+  Combined   : 18.56 Mbps  (theoretical max ~20 Mbps)
+
+  Waiting 5s for TIME_WAIT sockets to clear...
+
+==============================================================
+  PART 2 — MPTCP AGGREGATION (no failure)
+==============================================================
+  Two parallel streams, one bound per interface.
+  Baseline to compare against the collapse experiment.
+  Running 15s baseline transfer...
+  [OK] Done after ~19s
+
+--------------------------------------------------------------
+  MPTCP baseline — Path 1
+--------------------------------------------------------------
+  Duration      : 15.0 s
+  Avg throughput: 9.38 Mbps
+  Peak          : 20.99 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 24.10 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  MPTCP baseline — Path 2
+--------------------------------------------------------------
+  Duration      : 15.0 s
+  Avg throughput: 9.38 Mbps
+  Peak          : 20.99 Mbps
+  Min           : 7.81 Mbps
+  Data sent     : 24.09 MB
+  Retransmits   : 0
+
+==============================================================
+  GRAPH — MPTCP aggregation baseline
+==============================================================
+
+    Mbps  |
+    42.0  |            o o 
+    38.5  |                
+    35.0  |      o         
+    31.5  | o              
+    28.0  |    o           
+    24.5  |   o            
+    21.0  |  o    ooooo*o*o
+    17.5  | *    *         
+    14.0  |    *o          
+    10.5  |  **   ***** * *
+     7.0  |     *          
+     3.5  |                
+     0.0  |                
+          +----------------
+                5    0    5
+                time (seconds) →
+
+  #  Path 1 (10 Mbps)                     avg: 12.85 Mbps
+  *  Path 2 (10 Mbps)                     avg: 12.85 Mbps
+  o  Combined total                       avg: 25.70 Mbps
+
+--------------------------------------------------------------
+  MPTCP BASELINE SUMMARY
+--------------------------------------------------------------
+  Path 1 avg         : 9.38 Mbps
+  Path 2 avg         : 9.38 Mbps
+  Combined avg       : 18.76 Mbps
+  TCP combined       : 18.56 Mbps
+  Aggregation eff.   : 101.1%
+
+==============================================================
+  PART 3 — BANDWIDTH COLLAPSE ON PATH 2
+==============================================================
+  Both paths start at 10 Mbps.
+  At t=10s, Path 2 is throttled to 2 Mbps.
+  Observing MPTCP scheduler response.
+
+  [t= 0]  Both paths running at 10 Mbps.
+  [t=10]  Collapsing Path 2 bandwidth to 2 Mbps...
+
+  [tc] Reshaping Path 2 interfaces to 2 Mbit/s ...
+  [tc] h1:h1-eth1  => 2 Mbit/s  [check manually]
+  [tc] h2:h2-eth1  => 2 Mbit/s  [check manually]
+  [tc] s2:s2-eth1  => 2 Mbit/s  [OK]
+  [tc] s2:s2-eth2  => 2 Mbit/s  [OK]
+          Path 2 is now throttled to 2 Mbps.
+          MPTCP should shift excess load to Path 1.
+
+  Waiting for transfers to complete (~15s remaining)...
+  [OK] Done after ~20s
+
+--------------------------------------------------------------
+  Collapse experiment — Path 1(stable 10 Mbps)
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 9.45 Mbps
+  Peak          : 20.98 Mbps
+  Min           : 0.00 Mbps
+  Data sent     : 40.22 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  Collapse experiment — Path 2(collapsed at t=10s)
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 4.67 Mbps
+  Peak          : 19.82 Mbps
+  Min           : 0.00 Mbps
+  Data sent     : 17.94 MB
+  Retransmits   : 1863
+
+==============================================================
+  PER-SECOND THROUGHPUT — BANDWIDTH COLLAPSE
+==============================================================
+   t(s)    Path1    Path2    Total  bar                     note
+  ─────  ───────  ───────  ───────  ──────────────────────  ────────────────────
+      1    18.09    18.09    36.18  ████████████████████    
+      2    10.42    10.42    20.85  ███████████             
+      3    11.99    11.99    23.98  █████████████           
+      4    14.08    14.08    28.15  ███████████████         
+      5     7.82     7.82    15.64  ████████                
+      6     8.86     8.86    17.72  █████████               
+      7    19.82    19.82    39.64  ██████████████████████  
+      8    10.48    10.49    20.97  ███████████             
+      9    10.49    10.49    20.97  ███████████             
+     10    10.48    10.49    20.97  ███████████             <-- last second at 10 Mbps
+     11    10.49     0.00    10.49  █████                   <-- COLLAPSE INJECTED
+     12    10.48     0.00    10.48  █████                   <-- congestion window adjusting
+     13    20.98     0.00    20.98  ███████████             <-- MPTCP re-balancing
+     14    10.48     0.00    10.48  █████                   
+     15    20.98    10.49    31.47  █████████████████       
+     16    20.97     0.00    20.97  ███████████             
+     17    10.48     0.00    10.48  █████                   
+     18    20.98     0.00    20.98  ███████████             
+     19    20.98     0.00    20.98  ███████████             
+     20     0.00    10.49    10.49  █████                   
+     21    10.49     0.00    10.49  █████                   
+     22    10.49     0.00    10.49  █████                   
+     23    10.48     0.00    10.48  █████                   
+     24    10.49     0.00    10.49  █████                   
+     25    10.49     0.00    10.49  █████                   
+
+==============================================================
+  GRAPH — MPTCP during bandwidth collapse
+==============================================================
+
+    Mbps  |
+    39.6  |       o                  
+    36.3  | o                        
+    33.0  |               o          
+    29.7  |    o                     
+    26.4  |                          
+    23.1  |   o                      
+    19.8  |  o    *ooo  o #o oo      
+    16.5  | *   oo                   
+    13.2  |   **                     
+     9.9  |  *   * ***oo o* o  oooooo
+     6.6  |     *                    
+     3.3  |                          
+     0.0  |           **** ****#*****
+          +--------------------------
+                5    0    5    0    5
+                time (seconds) →
+                      ^
+                      collapse at t=11s
+
+  #  Path 1 — stable (10 Mbps)            avg: 12.87 Mbps
+  *  Path 2 — collapsed to 2 Mbps at t=10s  avg: 5.74 Mbps
+  o  Combined total                       avg: 18.61 Mbps
+
+==============================================================
+  COLLAPSE EXPERIMENT SUMMARY
+==============================================================
+  Avg combined BEFORE collapse  : 24.51 Mbps
+  Avg combined AFTER  collapse  : 15.33 Mbps
+  Throughput retained           :62.5%
+
+  Path 1 avg before collapse    : 12.25 Mbps
+  Path 1 avg after  collapse    : 13.71 Mbps
+  [OK]  MPTCP shifted load — Path 1 increased to compensate
+
+  Path 2 avg (whole 25s)        : 4.67 Mbps
+  Path 1 avg (whole 25s)        : 9.45 Mbps
+
+==============================================================
+  ALL EXPERIMENTS COMPLETE
+==============================================================

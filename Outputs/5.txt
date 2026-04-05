@@ -1,0 +1,355 @@
+
+==============================================================
+  MPTCP vs TCP — RTT SPIKE EXPERIMENT
+==============================================================
+  Topology : h1 <--[s1  Path 1  10 Mbps / 40ms RTT]--> h2
+             h1 <--[s2  Path 2  10 Mbps / 40ms RTT]--> h2
+  Flow     : (1) TCP baseline  (2) MPTCP baseline  (3) TCP + Path 2 spike
+             (4) MPTCP + Path 2 spike  (5) final results table
+
+==============================================================
+  CONNECTIVITY CHECK
+==============================================================
+  ping 10.0.0.2  =>  [OK]    3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+  ping 10.0.1.2  =>  [OK]    3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+
+==============================================================
+  PART 1 — TCP BASELINE (both paths, independently)
+==============================================================
+  Regular TCP, one path at a time, 10s each.
+
+--------------------------------------------------------------
+  TCP — Path 1 (10 Mbps, 40ms RTT)
+--------------------------------------------------------------
+  Duration      : 10.0 s
+  Avg throughput: 9.28 Mbps
+  Peak          : 17.72 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 14.89 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  TCP — Path 2 (10 Mbps, 40ms RTT)
+--------------------------------------------------------------
+  Duration      : 10.0 s
+  Avg throughput: 9.28 Mbps
+  Peak          : 17.72 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 14.89 MB
+  Retransmits   : 0
+
+==============================================================
+  GRAPH — TCP baseline per path
+==============================================================
+
+    Mbps  |
+    17.7  |      *    
+    16.2  | *         
+    14.8  |    *      
+    13.3  |           
+    11.8  |   *       
+    10.3  |  *    ****
+     8.9  |           
+     7.4  |     *     
+     5.9  |           
+     4.4  |           
+     3.0  |           
+     1.5  |           
+     0.0  |           
+          +-----------
+                5    0
+                time (seconds) →
+
+  #  TCP Path 1 (10 Mbps cap)             avg: 11.91 Mbps
+  *  TCP Path 2 (10 Mbps cap)             avg: 11.91 Mbps
+
+--------------------------------------------------------------
+  TCP BASELINE SUMMARY
+--------------------------------------------------------------
+  Path 1 avg : 9.28 Mbps  (cap 10 Mbps)
+  Path 2 avg : 9.28 Mbps  (cap 10 Mbps)
+  Combined   : 18.56 Mbps  (theoretical max ~20 Mbps)
+
+  Waiting 5s for TIME_WAIT sockets to clear...
+
+==============================================================
+  PART 2 — MPTCP BASELINE (no RTT spike)
+==============================================================
+  Two parallel streams, one bound per interface.
+  Baseline to compare against Parts 3–4 (RTT spike on Path 2).
+  Running 15s baseline transfer...
+  [OK] Done after ~19s
+
+--------------------------------------------------------------
+  MPTCP baseline — Path 1
+--------------------------------------------------------------
+  Duration      : 15.0 s
+  Avg throughput: 9.38 Mbps
+  Peak          : 20.98 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 24.49 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  MPTCP baseline — Path 2
+--------------------------------------------------------------
+  Duration      : 15.0 s
+  Avg throughput: 9.38 Mbps
+  Peak          : 20.98 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 24.49 MB
+  Retransmits   : 0
+
+==============================================================
+  GRAPH — MPTCP aggregation baseline
+==============================================================
+
+    Mbps  |
+    42.0  |             o o
+    38.5  |       o        
+    35.0  | o              
+    31.5  |                
+    28.0  |    o           
+    24.5  |   o            
+    21.0  |  o    *ooooo*o*
+    17.5  | *    o         
+    14.0  |    *o          
+    10.5  |  **  * ***** * 
+     7.0  |     *          
+     3.5  |                
+     0.0  |                
+          +----------------
+                5    0    5
+                time (seconds) →
+
+  #  Path 1 (10 Mbps)                     avg: 13.06 Mbps
+  *  Path 2 (10 Mbps)                     avg: 13.06 Mbps
+  o  Combined total                       avg: 26.12 Mbps
+
+--------------------------------------------------------------
+  MPTCP BASELINE SUMMARY
+--------------------------------------------------------------
+  Path 1 avg         : 9.38 Mbps
+  Path 2 avg         : 9.38 Mbps
+  Combined avg       : 18.76 Mbps
+  TCP combined       : 18.56 Mbps
+  Aggregation eff.   : 101.0%
+
+==============================================================
+  PART 3 — TCP ON PATH 2 WITH RTT SPIKE (~40 ms → ~800 ms)
+==============================================================
+  Regular TCP only on Path 2 (10.0.1.x). Path 1 idle.
+  At t=10s, Path 2 RTT spikes to ~800 ms (tc netem).
+  Expect cwnd/throughput reaction on the single TCP path.
+
+  [t= 0]  TCP on Path 2 at ~40 ms RTT, 10 Mbps.
+At t=10s, injecting Path 2 RTT spike: ~40 ms → ~800 ms.
+
+  [tc] Injecting Path 2 RTT spike (netem delay 800 ms per hop; target ~800 ms RTT)
+  [tc] h1:h1-eth1  => netem delay 800 ms  [OK]
+  [tc] h2:h2-eth1  => netem delay 800 ms  [OK]
+  [tc] s2:s2-eth1  => netem delay 800 ms  [OK]
+  [tc] s2:s2-eth2  => netem delay 800 ms  [OK]
+
+  Waiting for TCP transfer (~15s remaining)...
+  [OK] Done after ~22s
+
+--------------------------------------------------------------
+  TCP — Path 2 only, RTT spike at t=10s
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 4.22 Mbps
+  Peak          : 17.73 Mbps
+  Min           : 0.00 Mbps
+  Data sent     : 17.54 MB
+  Retransmits   : 496
+
+==============================================================
+  GRAPH — TCP Path 2 during RTT spike
+==============================================================
+
+    Mbps  |
+    17.7  |      #                   
+    16.3  | #                        
+    14.8  |    #                     
+    13.3  |                          
+    11.8  |   #                      
+    10.3  |  #    ####         #    #
+     8.9  |                          
+     7.4  |     #                    
+     5.9  |                          
+     4.4  |                          
+     3.0  |                          
+     1.5  |                          
+     0.0  |           ######### #### 
+          +--------------------------
+                5    0    5    0    5
+                time (seconds) →
+                      ^
+                      RTT spike at t=11s
+
+  #  TCP Path 2 throughput (RTT spike at t=10s)  avg: 5.61 Mbps
+
+--------------------------------------------------------------
+  TCP PATH 2 RTT SPIKE — QUICK SUMMARY
+--------------------------------------------------------------
+  Avg throughput BEFORE spike (Path 2): 11.93 Mbps
+  Avg throughput AFTER  spike (Path 2): 1.61 Mbps
+  Throughput retained                  : 13.5%
+
+  [tc] Restoring Path 2 to baseline (netem delay 20 ms per hop; ~40 ms RTT)
+  [tc] h1:h1-eth1  => netem delay 20 ms  [OK]
+  [tc] h2:h2-eth1  => netem delay 20 ms  [OK]
+  [tc] s2:s2-eth1  => netem delay 20 ms  [OK]
+  [tc] s2:s2-eth2  => netem delay 20 ms  [OK]
+
+  Waiting 5s after Path 2 restore (TIME_WAIT / tc settle)...
+
+==============================================================
+  PART 4 — MPTCP WITH PATH 2 RTT SPIKE (~40 ms → ~800 ms)
+==============================================================
+  Both paths: 10 Mbps; baseline RTT ~40 ms on each path.
+  At t=10s, Path 2 RTT spikes to ~800 ms (tc netem on Path 2 only).
+  Two parallel streams (Path 1 + Path 2); scheduler shifts toward Path 1.
+
+  [t= 0]  Both paths at 10 Mbps, ~40 ms RTT.
+At t=10s, injecting Path 2 RTT spike: ~40 ms → ~800 ms.
+
+  [tc] Injecting Path 2 RTT spike (netem delay 800 ms per hop; target ~800 ms RTT)
+  [tc] h1:h1-eth1  => netem delay 800 ms  [OK]
+  [tc] h2:h2-eth1  => netem delay 800 ms  [OK]
+  [tc] s2:s2-eth1  => netem delay 800 ms  [OK]
+  [tc] s2:s2-eth2  => netem delay 800 ms  [OK]
+          Path 2 — high-delay path (~800 ms RTT); minRTT should prefer Path 1.
+          MPTCP should shift load off the degraded Path 2 subflow.
+
+  Waiting for transfers to complete (~15s remaining)...
+  [OK] Done after ~21s
+
+--------------------------------------------------------------
+  MPTCP spike run — Path 1 (stable ~40 ms RTT, 10 Mbps)
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 9.45 Mbps
+  Peak          : 20.99 Mbps
+  Min           : 0.00 Mbps
+  Data sent     : 39.80 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  MPTCP spike run — Path 2 (spike to ~800 ms RTT at t=10s)
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 5.78 Mbps
+  Peak          : 17.73 Mbps
+  Min           : 0.00 Mbps
+  Data sent     : 21.47 MB
+  Retransmits   : 17
+
+==============================================================
+  PER-SECOND THROUGHPUT — MPTCP UNDER PATH 2 RTT SPIKE
+==============================================================
+   t(s)    Path1    Path2    Total  bar                     note
+  ─────  ───────  ───────  ───────  ──────────────────────  ────────────────────
+      1    16.33    16.42    32.75  ████████████████████    
+      2     9.90     9.90    19.81  ████████████            
+      3    11.99    11.99    23.98  ██████████████          
+      4    14.07    14.08    28.15  █████████████████       
+      5     7.82     7.82    15.64  █████████               
+      6    17.72    17.73    35.45  ██████████████████████  
+      7     9.90     9.90    19.81  ████████████            
+      8    10.49    10.48    20.97  █████████████           
+      9    10.48    10.49    20.97  █████████████           
+     10    10.48    10.48    20.97  █████████████           <-- last second at baseline ~40 ms RTT
+     11    10.48     0.00    10.48  ██████                  <-- RTT SPIKE INJECTED (~800 ms on Path 2)
+     12    20.99     0.00    20.99  █████████████           <-- TCP/MPTCP reacting to inflated RTT
+     13    10.48    10.50    20.98  █████████████           <-- MPTCP scheduler re-balancing subflows
+     14    20.97     0.00    20.97  █████████████           
+     15    10.48    10.49    20.97  █████████████           
+     16    20.97     0.00    20.97  █████████████           
+     17    20.98     0.00    20.98  █████████████           
+     18    20.97    10.49    31.46  ███████████████████     
+     19    10.48     0.00    10.48  ██████                  
+     20    10.49     0.00    10.49  ██████                  
+     21    10.49    10.49    20.98  █████████████           
+     22    10.48     0.00    10.48  ██████                  
+     23    10.49     0.00    10.49  ██████                  
+     24    10.49    10.49    20.98  █████████████           
+     25     0.00     0.00     0.00                          
+
+==============================================================
+  GRAPH — MPTCP during Path 2 RTT spike
+==============================================================
+
+    Mbps  |
+    35.4  |      o                   
+    32.5  | o                o       
+    29.5  |    o                     
+    26.6  |                          
+    23.6  |   o                      
+    20.7  |  o    oooo oooooo#  o  o 
+    17.7  | *    *                   
+    14.8  |    *o                    
+    11.8  |   *    ***o * *  *oo*oo* 
+     8.9  |  *  * *                  
+     5.9  |                          
+     3.0  |                          
+     0.0  |           ** * ** ** ** o
+          +--------------------------
+                5    0    5    0    5
+                time (seconds) →
+                      ^
+                      RTT spike at t=11s
+
+  #  Path 1 — stable (~40 ms RTT, 10 Mbps)  avg: 12.74 Mbps
+  *  Path 2 — RTT spike ~40 ms → ~800 ms at t=10s  avg: 6.87 Mbps
+  o  Combined total                       avg: 19.61 Mbps
+
+--------------------------------------------------------------
+  MPTCP RTT SPIKE — QUICK SUMMARY
+--------------------------------------------------------------
+  Avg combined BEFORE RTT spike : 23.85 Mbps
+  Avg combined AFTER  RTT spike : 16.94 Mbps
+  Throughput retained           : 71.0%
+
+  Path 1 avg before spike       : 11.92 Mbps
+  Path 1 avg after  spike       : 12.91 Mbps
+  Path 2 avg before spike       : 11.93 Mbps
+  Path 2 avg after  spike       : 4.03 Mbps
+  [INFO] Path 1 did not significantly increase
+         (scheduler may need stronger RTT contrast or more time)
+
+  Path 1 avg (whole 25s run) : 9.45 Mbps
+  Path 2 avg (whole 25s run) : 5.78 Mbps
+
+==============================================================
+  PART 5 — FINAL RESULTS (TCP vs MPTCP, RTT SPIKE ON PATH 2)
+==============================================================
+  Metric                                                   Value
+  ────────────────────────────────────────────────  ────────────
+  TCP baseline — Path 1 avg (Mbps)                          9.28
+  TCP baseline — Path 2 avg (Mbps)                          9.28
+  TCP baseline — combined (sum of paths, Mbps)             18.56
+  MPTCP baseline — Path 1 avg (Mbps)                        9.38
+  MPTCP baseline — Path 2 avg (Mbps)                        9.38
+  MPTCP baseline — combined (Mbps)                         18.76
+  ────────────────────────────────────────────────  ────────────
+  TCP Path 2 only — avg during spike run (Mbps)             4.22
+  TCP Path 2 only — avg BEFORE spike (Mbps)                11.93
+  TCP Path 2 only — avg AFTER spike (Mbps)                  1.61
+  TCP Path 2 only — throughput retained (%)                 13.5
+  ────────────────────────────────────────────────  ────────────
+  MPTCP spike — combined avg BEFORE spike (Mbps)           23.85
+  MPTCP spike — combined avg AFTER spike (Mbps)            16.94
+  MPTCP spike — combined throughput retained (%)            71.0
+  MPTCP spike — Path 1 avg BEFORE spike (Mbps)             11.92
+  MPTCP spike — Path 1 avg AFTER spike (Mbps)              12.91
+  MPTCP spike — Path 2 avg BEFORE spike (Mbps)             11.93
+  MPTCP spike — Path 2 avg AFTER spike (Mbps)               4.03
+  ────────────────────────────────────────────────  ────────────
+  Post-spike: MPTCP combined / TCP Path 2 only             10.50x
+
+
+==============================================================
+  ALL EXPERIMENTS COMPLETE
+==============================================================
