@@ -8,7 +8,8 @@ import json
 import subprocess
 
 # ─────────────────────────────────────────────
-#  Topology — symmetric dual path, same BW/RTT
+#  Topology — dual path, 10 Mbps each; Path 1 lower RTT (Wi‑Fi-like),
+#  Path 2 higher RTT (LTE-like). Same BW; RTT differs by link delay.
 # ─────────────────────────────────────────────
 
 class DualPathTopo(Topo):
@@ -16,8 +17,8 @@ class DualPathTopo(Topo):
         h1 = self.addHost('h1', ip=None)
         h2 = self.addHost('h2', ip=None)
 
-        s1 = self.addSwitch('s1', cls=OVSBridge)   # Path 1 (stable)
-        s2 = self.addSwitch('s2', cls=OVSBridge)   # Path 2 (will collapse)
+        s1 = self.addSwitch('s1', cls=OVSBridge)   # Path 1 — Wi‑Fi-like
+        s2 = self.addSwitch('s2', cls=OVSBridge)   # Path 2 — LTE-like
 
         self.addLink(h1, s1, bw=10, delay='20ms')
         self.addLink(s1, h2, bw=10, delay='20ms')
@@ -70,6 +71,13 @@ def setup_routing(h1, h2):
 
 
 def setup_mptcp(h1, h2):
+    """
+    Enable MPTCP and endpoints for a dual-homed setup. The handover section uses
+    two interface-bound iperf3 TCP flows (aggregation emulation); the scheduler
+    does not split one socket across them. Endpoints + policy routing match a
+    real MPTCP-capable stack; use a single MPTCP iperf if you need true
+    subflow scheduling in the kernel.
+    """
     for host in (h1, h2):
         host.cmd('sysctl -w net.mptcp.enabled=1')
         host.cmd("sysctl -w net.mptcp.scheduler=blest")
@@ -107,7 +115,7 @@ def _tc_set_rate(host, iface, rate_mbit, delay_ms=20):
     """
 
     rate = f"{rate_mbit}mbit"
-    burst = "4kbit"
+    burst = "32kbit"
     latency = "50ms"
 
     # Delete existing qdisc safely
@@ -126,100 +134,60 @@ def _tc_set_rate(host, iface, rate_mbit, delay_ms=20):
     )
 
     return host.cmd(f'tc qdisc show dev {iface}')
-    
 
-def degrade_path1_for_handover(net, h1, h2, delay_ms=100, init=False):
+
+def throttle_path1(net, h1, h2, rate_mbit=2, delay_ms=25):
     """
-    Stable handover: change RTT WITHOUT resetting qdisc
+    Cap Path 1 bandwidth symmetrically (data + ACK directions), like Path 2
+    collapse in 4.py: host ifaces + OVS ports on s1.
     """
+    print(f"\n  [tc] Throttling Path 1 to {rate_mbit} Mbit/s (handover / weak link)...")
 
-    print(f"\n  [tc] Updating Path 1 → RTT {delay_ms} ms")
-
-    def set_delay(host, iface):
-        if init:
-            # Only once: create qdisc
-            host.cmd(f'tc qdisc del dev {iface} root 2>/dev/null || true')
-            host.cmd(f'tc qdisc add dev {iface} root netem delay {delay_ms}ms')
-        else:
-            # IMPORTANT: use change, not delete+add
-            host.cmd(f'tc qdisc change dev {iface} root netem delay {delay_ms}ms')
-
-        return host.cmd(f'tc qdisc show dev {iface}')
-
-    # Host interfaces
     for host, iface in [(h1, 'h1-eth0'), (h2, 'h2-eth0')]:
-        result = set_delay(host, iface)
-        print(f"  [tc] {host.name}:{iface}  => {delay_ms} ms")
-
-    # Switch ports
-    import subprocess
-    try:
-        ports = subprocess.check_output(
-            ['ovs-vsctl', 'list-ports', 's1'],
-            stderr=subprocess.DEVNULL
-        ).decode().strip().split('\n')
-        ports = [p.strip() for p in ports if p.strip()]
-    except:
-        ports = []
-
-    for port in ports:
-        if init:
-            subprocess.run(
-                ['tc','qdisc','replace','dev',port,'root','netem',f'delay {delay_ms}ms'],
-                capture_output=True
-            )
-        else:
-            subprocess.run(
-                ['tc','qdisc','change','dev',port,'root','netem',f'delay {delay_ms}ms'],
-                capture_output=True
-            )
-
-        print(f"  [tc] s1:{port}  => {delay_ms} ms")
-
-def spike_rtt_path2(net, h1, h2, delay_ms=200):
-    """
-    RTT spike on Path 2 (NO bandwidth change).
-    Symmetric delay injection (data + ACK path).
-    """
-
-    print(f"\n  [tc] Injecting RTT spike → {delay_ms} ms")
-
-    # ── Host interfaces ──
-    for host, iface in [(h1, 'h1-eth1'), (h2, 'h2-eth1')]:
-        host.cmd(f'tc qdisc del dev {iface} root 2>/dev/null || true')
-
-        # ONLY delay (no tbf!)
-        host.cmd(
-            f'tc qdisc add dev {iface} root netem delay {delay_ms}ms'
-        )
-
-        result = host.cmd(f'tc qdisc show dev {iface}')
+        result = _tc_set_rate(host, iface, rate_mbit, delay_ms)
         status = 'OK' if 'netem' in result else 'check manually'
-        print(f"  [tc] {host.name}:{iface}  => {delay_ms} ms  [{status}]")
+        print(f"  [tc] {host.name}:{iface}  => {rate_mbit} Mbit/s  [{status}]")
 
-    # ── Switch ports (same logic as your code) ──
-    import subprocess
     try:
         ports_raw = subprocess.check_output(
-            ['ovs-vsctl', 'list-ports', 's2'],
-            stderr=subprocess.DEVNULL
+            ['ovs-vsctl', 'list-ports', 's1'],
+            stderr=subprocess.DEVNULL,
         ).decode().strip().split('\n')
         ports = [p.strip() for p in ports_raw if p.strip()]
     except Exception as e:
-        print(f"  [tc] Could not list s2 ports: {e}")
+        print(f"  [tc] Could not list s1 ports: {e} — skipping switch shaping")
         ports = []
 
     for port in ports:
         try:
-            subprocess.run(
-                ['tc', 'qdisc', 'replace', 'dev', port,
-                 'root', 'netem',
-                 f'delay {delay_ms}ms'],
-                capture_output=True, text=True
-            )
-            print(f"  [tc] s2:{port}  => {delay_ms} ms  [OK]")
+            result = subprocess.check_output(
+                ['tc', 'qdisc', 'show', 'dev', port],
+                stderr=subprocess.DEVNULL,
+            ).decode()
+            if 'netem' in result:
+                subprocess.run(
+                    [
+                        'tc', 'qdisc', 'change', 'dev', port, 'root',
+                        'netem', f'rate {rate_mbit * 1000}kbit',
+                        f'delay {delay_ms}ms',
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+            else:
+                subprocess.run(
+                    [
+                        'tc', 'qdisc', 'add', 'dev', port, 'root',
+                        'netem', f'rate {rate_mbit * 1000}kbit',
+                        f'delay {delay_ms}ms',
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+            print(f"  [tc] s1:{port}  => {rate_mbit} Mbit/s  [OK]")
         except Exception as e:
-            print(f"  [tc] s2:{port}  => skipped ({e})")
+            print(f"  [tc] s1:{port}  => skipped ({e})")
+
 
 # ─────────────────────────────────────────────
 #  Output helpers
@@ -348,11 +316,13 @@ def run_tcp_baseline(h1, h2):
     time.sleep(1.5)
 
     r1 = h1.cmd('iperf3 -c 10.0.0.2 -B 10.0.0.1 -t 10 -i 1 --json')
-    t1, bw1 = parse_iperf_json(r1, "TCP — Path 1 (10 Mbps, 40ms RTT)")
+    t1, bw1 = parse_iperf_json(
+        r1, "TCP — Path 1 (10 Mbps, ~80 ms RTT — Wi‑Fi-like)")
     time.sleep(1)
 
     r2 = h1.cmd('iperf3 -c 10.0.1.2 -B 10.0.1.1 -t 10 -i 1 --json')
-    t2, bw2 = parse_iperf_json(r2, "TCP — Path 2 (10 Mbps, 40ms RTT)")
+    t2, bw2 = parse_iperf_json(
+        r2, "TCP — Path 2 (10 Mbps, ~200 ms RTT — LTE-like)")
 
     h2.cmd('pkill -f iperf3')
 
@@ -378,8 +348,8 @@ def run_tcp_baseline(h1, h2):
 
 def run_mptcp_baseline(h1, h2, tcp1, tcp2):
     banner("PART 2 — MPTCP AGGREGATION (no failure)")
-    print("  Two parallel streams, one bound per interface.")
-    print("  Baseline to compare against the collapse experiment.")
+    print("  Two parallel TCP streams, one bound per interface (aggregation model).")
+    print("  Baseline before Path 1 handover (rate collapse).")
 
     h2.cmd('pkill -f iperf3 2>/dev/null; sleep 0.3')
     h2.cmd('iperf3 -s -p 5201 &')
@@ -419,17 +389,19 @@ def run_mptcp_baseline(h1, h2, tcp1, tcp2):
 
 
 # ─────────────────────────────────────────────
-#  Part 3 — MPTCP during bandwidth collapse
+#  Part 3 — Handover: Path 1 (Wi‑Fi) rate collapse; Path 2 (LTE) stays 10 Mbps
 # ─────────────────────────────────────────────
 
 HANDOVER_AT = 10
+PATH1_AFTER_HANDOVER_MBPS = 2
+IPERF_HANDOVER_SEC = 25
 
 def run_handover_experiment(net, h1, h2):
-    banner("PART 4 — HANDOVER (WiFi → LTE transition)")
+    banner("PART 3 — HANDOVER (Path 1 Wi‑Fi-like → weak link, Path 2 stable)")
 
-    print(f"  Both paths start equal (10 Mbps, 40 ms RTT).")
-    print(f"  At t={HANDOVER_AT}s, Path 1 degrades (WiFi weak).")
-    print(f"  MPTCP should shift traffic to Path 2 smoothly.")
+    print("  Both paths: 10 Mbps. Path 1 lower baseline RTT (~80 ms); Path 2 higher (~200 ms).")
+    print(f"  At t={HANDOVER_AT}s, Path 1 is throttled to {PATH1_AFTER_HANDOVER_MBPS} Mbps (symmetric tc).")
+    print("  Two parallel TCP flows: Path 1 throughput should drop; Path 2 stays ~10 Mbps.")
 
     # ── Start servers ──
     h2.cmd('pkill -f iperf3 2>/dev/null; sleep 0.3')
@@ -439,27 +411,28 @@ def run_handover_experiment(net, h1, h2):
 
     # ── Start transfers ──
     h1.cmd('rm -f /tmp/h1.json /tmp/h2.json')
-    h1.cmd(f'iperf3 -c 10.0.0.2 -B 10.0.0.1 -p 5201 '
-           f'-t 25 -i 1 --json > /tmp/h1.json 2>&1 &')
-    h1.cmd(f'iperf3 -c 10.0.1.2 -B 10.0.1.1 -p 5202 '
-           f'-t 25 -i 1 --json > /tmp/h2.json 2>&1 &')
+    h1.cmd(
+        f'iperf3 -c 10.0.0.2 -B 10.0.0.1 -p 5201 '
+        f'-t {IPERF_HANDOVER_SEC} -i 1 --json > /tmp/h1.json 2>&1 &')
+    h1.cmd(
+        f'iperf3 -c 10.0.1.2 -B 10.0.1.1 -p 5202 '
+        f'-t {IPERF_HANDOVER_SEC} -i 1 --json > /tmp/h2.json 2>&1 &')
 
-    print(f"\n  [t= 0]  Both paths active (balanced).")
+    print(f"\n  [t= 0]  Both paths at 10 Mbps (dual streams running).")
     time.sleep(HANDOVER_AT)
 
-    #print(f"  [t={HANDOVER_AT}]  WiFi degrading → triggering handover...")
+    print(f"\n  [t≈{HANDOVER_AT}]  Handover: throttling Path 1 to "
+          f"{PATH1_AFTER_HANDOVER_MBPS} Mbps...")
+    throttle_path1(
+        net, h1, h2,
+        rate_mbit=PATH1_AFTER_HANDOVER_MBPS,
+        delay_ms=25,
+    )
+    time.sleep(2)
 
-    # Step 2: gradual WiFi degradation
-    degrade_path1_for_handover(net, h1, h2, delay_ms=100, init=True)
-    time.sleep(5)
-
-    for d in [150, 200, 250]:
-        degrade_path1_for_handover(net, h1, h2, delay_ms=d, init=(d==100))
-        time.sleep(5)
-
-    print("          Path 1 now high RTT → scheduler should prefer Path 2.")
     # ── Wait for transfers ──
-    print(f"\n  Waiting for transfers (~{25 - HANDOVER_AT}s remaining)...")
+    rem = max(0, IPERF_HANDOVER_SEC - HANDOVER_AT - 2)
+    print(f"\n  Waiting for iperf to finish (~{rem}s)...")
     r1, r2 = wait_for_files(h1, ['/tmp/h1.json', '/tmp/h2.json'], timeout=40)
 
     t1, bw1 = parse_iperf_json(r1, "Handover — Path 1 (degraded WiFi)")
@@ -481,9 +454,9 @@ def run_handover_experiment(net, h1, h2):
             if i == HANDOVER_AT - 1:
                 note = '<-- last balanced second'
             elif i == HANDOVER_AT:
-                note = '<-- HANDOVER START'
+                note = '<-- handover: Path 1 throttled'
             elif i == HANDOVER_AT + 1:
-                note = '<-- shifting traffic'
+                note = '<-- Path 1 TCP adapting'
             print(f"  {i+1:>5}  {b1:>7.2f}  {b2:>7.2f}  {bc:>7.2f}  {note}")
 
         # ── Graph ──
@@ -492,7 +465,7 @@ def run_handover_experiment(net, h1, h2):
             ['Path 1 — degrading WiFi',
              'Path 2 — preferred LTE',
              'Combined total'],
-            'GRAPH — MPTCP during handover',
+            'GRAPH — dual-path throughput (Path 1 handover)',
             collapse_at=HANDOVER_AT
         )
 
@@ -515,10 +488,14 @@ def run_handover_experiment(net, h1, h2):
         print(f"\n  Path 1 before : {p1_pre:.2f} Mbps")
         print(f"  Path 1 after  : {p1_post:.2f} Mbps")
 
-        if p1_post < p1_pre * 0.5:
-            print("  [OK] Traffic shifted away from degraded path")
+        # After throttle, Path 1 steady rate should sit near PATH1_AFTER_HANDOVER_MBPS
+        thresh = max(4.0, PATH1_AFTER_HANDOVER_MBPS * 1.8)
+        if p1_post < thresh and p1_post < p1_pre * 0.65:
+            print("  [OK] Path 1 throughput dropped after handover (rate cap visible)")
+        elif p1_post < p1_pre * 0.65:
+            print("  [OK] Path 1 dropped vs pre-handover (check tc if not near cap)")
         else:
-            print("  [INFO] Weak shift (scheduler dependent)")
+            print("  [WARN] Path 1 still high — verify tc on h1/h2 eth0 and s1 ports")
 
     print(f"\n  Path 2 avg (after handover): {sum(bw2[HANDOVER_AT+2:])/len(bw2[HANDOVER_AT+2:]):.2f} Mbps")
 
@@ -542,10 +519,11 @@ def run():
     net.start()
     h1, h2 = net.get('h1', 'h2')
 
-    banner("MPTCP vs TCP — BANDWIDTH COLLAPSE EXPERIMENT")
-    print("  Topology : h1 <--[s1  Path 1  10 Mbps / 40ms RTT]--> h2")
-    print("             h1 <--[s2  Path 2  10 Mbps / 40ms RTT]--> h2")
-    print("                         (Path 2 collapses to 2 Mbps at t=10s)")
+    banner("HANDOVER / FAIRNESS — DUAL PATH (6.py)")
+    print("  Topology : h1 <--[s1  Path 1  10 Mbps, ~80 ms RTT]--> h2  (Wi‑Fi-like)")
+    print("             h1 <--[s2  Path 2  10 Mbps, ~200 ms RTT]--> h2  (LTE-like)")
+    print(f"  Handover : at t≈{HANDOVER_AT}s Path 1 throttled to "
+          f"{PATH1_AFTER_HANDOVER_MBPS} Mbps; Path 2 stays 10 Mbps")
 
     setup_ips(h1, h2)
     setup_routing(h1, h2)
