@@ -1,0 +1,266 @@
+
+==============================================================
+  MPTCP vs TCP — BANDWIDTH COLLAPSE EXPERIMENT
+==============================================================
+  Topology : h1 <--[s1  Path 1  10 Mbps / 40ms RTT]--> h2
+             h1 <--[s2  Path 2  10 Mbps / 40ms RTT]--> h2
+                         (Path 2 collapses to 2 Mbps at t=10s)
+
+==============================================================
+  CONNECTIVITY CHECK
+==============================================================
+  ping 10.0.0.2  =>  [OK]    3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+  ping 10.0.1.2  =>  [OK]    3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+
+==============================================================
+  PART 1 — TCP BASELINE (each path independently)
+==============================================================
+  Regular TCP, one path at a time, 10s each.
+
+--------------------------------------------------------------
+  TCP — Path 1 (10 Mbps, 40ms RTT)
+--------------------------------------------------------------
+  Duration      : 10.0 s
+  Avg throughput: 9.28 Mbps
+  Peak          : 17.73 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 14.90 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  TCP — Path 2 (10 Mbps, 40ms RTT)
+--------------------------------------------------------------
+  Duration      : 10.0 s
+  Avg throughput: 8.68 Mbps
+  Peak          : 40.29 Mbps
+  Min           : 5.47 Mbps
+  Data sent     : 16.20 MB
+  Retransmits   : 0
+
+==============================================================
+  GRAPH — TCP baseline per path
+==============================================================
+
+    Mbps  |
+    40.3  |  *        
+    36.9  |           
+    33.6  |           
+    30.2  |           
+    26.9  |           
+    23.5  |           
+    20.1  |           
+    16.8  | #    #    
+    13.4  |   ##      
+    10.1  |  #********
+     6.7  | *   #     
+     3.4  |           
+     0.0  |           
+          +-----------
+                5    0
+                time (seconds) →
+
+  #  TCP Path 1 (10 Mbps cap)             avg: 11.92 Mbps
+  *  TCP Path 2 (10 Mbps cap)             avg: 12.96 Mbps
+
+--------------------------------------------------------------
+  TCP BASELINE SUMMARY
+--------------------------------------------------------------
+  Path 1 avg : 9.28 Mbps  (cap 10 Mbps)
+  Path 2 avg : 8.68 Mbps  (cap 10 Mbps)
+  Combined   : 17.97 Mbps  (theoretical max ~20 Mbps)
+
+  Waiting 5s for TIME_WAIT sockets to clear...
+
+==============================================================
+  PART 2 — MPTCP AGGREGATION (no failure)
+==============================================================
+  Two parallel streams, one bound per interface.
+  Baseline to compare against the collapse experiment.
+  Running 15s baseline transfer...
+  [OK] Done after ~21s
+
+--------------------------------------------------------------
+  MPTCP baseline — Path 1
+--------------------------------------------------------------
+  Duration      : 15.0 s
+  Avg throughput: 9.38 Mbps
+  Peak          : 20.98 Mbps
+  Min           : 7.82 Mbps
+  Data sent     : 24.49 MB
+  Retransmits   : 0
+
+--------------------------------------------------------------
+  MPTCP baseline — Path 2
+--------------------------------------------------------------
+  Duration      : 15.0 s
+  Avg throughput: 8.98 Mbps
+  Peak          : 32.89 Mbps
+  Min           : 6.10 Mbps
+  Data sent     : 24.54 MB
+  Retransmits   : 0
+
+==============================================================
+  GRAPH — MPTCP aggregation baseline
+==============================================================
+
+    Mbps  |
+    43.3  |  o             
+    39.7  |                
+    36.1  |                
+    32.5  |  *          ooo
+    28.9  |     o o        
+    25.3  | o  o           
+    21.7  |   o *  ooooo#*#
+    18.0  | #    o#        
+    14.4  |    #           
+    10.8  |  #** ********#*
+     7.2  | *   ##         
+     3.6  |                
+     0.0  |                
+          +----------------
+                5    0    5
+                time (seconds) →
+
+  #  Path 1 (10 Mbps)                     avg: 13.06 Mbps
+  *  Path 2 (10 Mbps)                     avg: 13.09 Mbps
+  o  Combined total                       avg: 26.15 Mbps
+
+--------------------------------------------------------------
+  MPTCP BASELINE SUMMARY
+--------------------------------------------------------------
+  Path 1 avg         : 9.38 Mbps
+  Path 2 avg         : 8.98 Mbps
+  Combined avg       : 18.36 Mbps
+  TCP combined       : 17.97 Mbps
+  Aggregation eff.   : 102.2%
+
+==============================================================
+  PART 4 — HANDOVER (WiFi → LTE transition)
+==============================================================
+  Both paths start equal (10 Mbps, 40 ms RTT).
+  At t=10s, Path 1 degrades (WiFi weak).
+  MPTCP should shift traffic to Path 2 smoothly.
+
+  [t= 0]  Both paths active (balanced).
+
+  [tc] Updating Path 1 → RTT 100 ms
+  [tc] h1:h1-eth0  => 100 ms
+  [tc] h2:h2-eth0  => 100 ms
+  [tc] s1:s1-eth1  => 100 ms
+  [tc] s1:s1-eth2  => 100 ms
+
+  [tc] Updating Path 1 → RTT 150 ms
+  [tc] h1:h1-eth0  => 150 ms
+  [tc] h2:h2-eth0  => 150 ms
+  [tc] s1:s1-eth1  => 150 ms
+  [tc] s1:s1-eth2  => 150 ms
+
+  [tc] Updating Path 1 → RTT 200 ms
+  [tc] h1:h1-eth0  => 200 ms
+  [tc] h2:h2-eth0  => 200 ms
+  [tc] s1:s1-eth1  => 200 ms
+  [tc] s1:s1-eth2  => 200 ms
+
+  [tc] Updating Path 1 → RTT 250 ms
+  [tc] h1:h1-eth0  => 250 ms
+  [tc] h2:h2-eth0  => 250 ms
+  [tc] s1:s1-eth1  => 250 ms
+  [tc] s1:s1-eth2  => 250 ms
+          Path 1 now high RTT → scheduler should prefer Path 2.
+
+  Waiting for transfers (~15s remaining)...
+  [OK] Done after ~1s
+
+--------------------------------------------------------------
+  Handover — Path 1 (degraded WiFi)
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 9.27 Mbps
+  Peak          : 17.73 Mbps
+  Min           : 0.00 Mbps
+  Data sent     : 33.27 MB
+  Retransmits   : 493
+
+--------------------------------------------------------------
+  Handover — Path 2 (LTE preferred)
+--------------------------------------------------------------
+  Duration      : 25.0 s
+  Avg throughput: 9.20 Mbps
+  Peak          : 40.26 Mbps
+  Min           : 5.39 Mbps
+  Data sent     : 39.78 MB
+  Retransmits   : 0
+
+==============================================================
+  PER-SECOND THROUGHPUT — HANDOVER
+==============================================================
+   t(s)    Path1    Path2    Total  note
+      1    16.51     5.39    21.90  
+      2     9.90    40.26    50.16  
+      3    11.99    10.49    22.48  
+      4    14.07    10.49    24.56  
+      5     7.82    10.49    18.30  
+      6    17.73    10.49    28.22  
+      7     9.90    10.48    20.38  
+      8    10.48    10.49    20.97  
+      9    10.49    10.49    20.97  
+     10    10.48    10.48    20.97  <-- last balanced second
+     11    10.49    10.49    20.98  <-- HANDOVER START
+     12     0.00    10.49    10.49  <-- shifting traffic
+     13    10.49    20.99    31.48  
+     14    10.49    10.48    20.97  
+     15    10.49    10.48    20.97  
+     16    10.49    20.98    31.46  
+     17    10.49    20.98    31.46  
+     18    10.49    10.48    20.97  
+     19    10.49    10.48    20.97  
+     20    10.49    10.49    20.97  
+     21    10.49    10.49    20.97  
+     22    10.49    10.49    20.98  
+     23    10.49    10.49    20.97  
+     24    10.49    10.48    20.97  
+     25    10.49    10.49    20.97  
+
+==============================================================
+  GRAPH — MPTCP during handover
+==============================================================
+
+    Mbps  |
+    50.2  |  o                       
+    46.0  |                          
+    41.8  |  *                       
+    37.6  |                          
+    33.4  |             o  oo        
+    29.3  |      o                   
+    25.1  |    o                     
+    20.9  | o o   ooooo *oo**oooooooo
+    16.7  | #   o#                   
+    12.5  |   *********o#**##********
+     8.4  |  #  # #                  
+     4.2  | *                        
+     0.0  |            #             
+          +--------------------------
+                5    0    5    0    5
+                time (seconds) →
+                      ^
+                      collapse at t=11s
+
+  #  Path 1 — degrading WiFi              avg: 10.65 Mbps
+  *  Path 2 — preferred LTE               avg: 12.73 Mbps
+  o  Combined total                       avg: 23.38 Mbps
+
+==============================================================
+  HANDOVER SUMMARY
+==============================================================
+  Avg BEFORE handover : 24.89 Mbps
+  Avg AFTER  handover : 23.39 Mbps
+
+  Path 1 before : 11.94 Mbps
+  Path 1 after  : 10.49 Mbps
+  [INFO] Weak shift (scheduler dependent)
+
+  Path 2 avg (after handover): 12.91 Mbps
+
+==============================================================
+  ALL EXPERIMENTS COMPLETE
+==============================================================
