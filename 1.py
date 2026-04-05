@@ -46,7 +46,9 @@ def setup_interfaces(h1, h2):
 import json
 
 def parse_iperf_result(raw_output, label):
-    """Parse iperf3 JSON output and print a clean summary"""
+    """Parse iperf3 JSON output and print a clean summary.
+    Returns (avg_mbps, per_second_mbps_list) for plotting; (0, []) on failure.
+    """
     try:
         json_start = raw_output.find('{')
         data = json.loads(raw_output[json_start:])
@@ -58,6 +60,9 @@ def parse_iperf_result(raw_output, label):
         throughput_mbps = received['bits_per_second'] / 1e6
         retransmits     = sent.get('retransmits', 0)
         duration        = sent['seconds']
+        per_sec         = [
+            iv['sum']['bits_per_second'] / 1e6 for iv in data.get('intervals', [])
+        ]
 
         print(f"\n{'='*45}")
         print(f"  {label}")
@@ -67,10 +72,12 @@ def parse_iperf_result(raw_output, label):
         print(f"  Data Sent    : {sent['bytes'] / 1e6:.2f} MB")
         print(f"  Retransmits  : {retransmits}")
         print(f"{'='*45}\n")
+        return throughput_mbps, per_sec
 
     except (json.JSONDecodeError, KeyError) as e:
         print(f"  [!] Could not parse result for {label}: {e}")
         print(f"  Raw output: {raw_output[:300]}")
+        return 0.0, []
 
 
 def run_tcp_baseline(h1, h2):
@@ -78,15 +85,39 @@ def run_tcp_baseline(h1, h2):
     h2.cmd('iperf3 -s -D')
     time.sleep(1)
 
-    result1 = h1.cmd('iperf3 -c 10.0.1.2 -t 10 -i 2 --json')
-    parse_iperf_result(result1, "PATH 1 — Wi-Fi-like (10ms RTT, 10Mbps)")
+    result1 = h1.cmd('iperf3 -c 10.0.1.2 -t 10 -i 1 --json')
+    t1, bw1 = parse_iperf_result(
+        result1, "PATH 1 — Wi-Fi-like (10ms RTT, 10Mbps)")
 
     time.sleep(1)
 
-    result2 = h1.cmd('iperf3 -c 10.0.2.2 -t 10 -i 2 --json')
-    parse_iperf_result(result2, "PATH 2 — LTE-like (50ms RTT, 20Mbps)")
+    result2 = h1.cmd('iperf3 -c 10.0.2.2 -t 10 -i 1 --json')
+    t2, bw2 = parse_iperf_result(
+        result2, "PATH 2 — LTE-like (50ms RTT, 20Mbps)")
 
     h2.cmd('pkill -f iperf3')
+
+    try:
+        from plot_helpers import save_bar_comparison, save_throughput_timeseries
+
+        if t1 > 0 or t2 > 0:
+            save_bar_comparison(
+                ["Wi-Fi-like path\n(10 Mbps cap)", "LTE-like path\n(20 Mbps cap)"],
+                [t1, t2],
+                "Baseline TCP: average throughput per path (independent flows)",
+                "fig01_tcp_baseline_avg_throughput.png",
+            )
+        if bw1 or bw2:
+            save_throughput_timeseries(
+                {
+                    "Path 1 — Wi-Fi-like (10 Mbps, ~20 ms RTT)": bw1,
+                    "Path 2 — LTE-like (20 Mbps, ~100 ms RTT)": bw2,
+                },
+                "Baseline TCP: throughput over time (separate runs)",
+                "fig01_tcp_baseline_timeseries.png",
+            )
+    except ImportError:
+        print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
 
 
  

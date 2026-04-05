@@ -330,6 +330,23 @@ def run_tcp_baseline(h1, h2):
         'GRAPH — TCP baseline per path'
     )
 
+    try:
+        from plot_helpers import save_bar_comparison, save_throughput_timeseries
+
+        save_throughput_timeseries(
+            {"TCP Path 1": bw1, "TCP Path 2": bw2},
+            "TCP baseline: independent single-path flows",
+            "fig04_tcp_baseline_timeseries.png",
+        )
+        save_bar_comparison(
+            ["Path 1", "Path 2", "Sum"],
+            [t1, t2, t1 + t2],
+            "TCP baseline: average throughput (Mbps)",
+            "fig04_tcp_baseline_bars.png",
+        )
+    except ImportError:
+        print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
+
     banner("TCP BASELINE SUMMARY", char='-')
     print(f"  Path 1 avg : {t1:.2f} Mbps  (cap 10 Mbps)")
     print(f"  Path 2 avg : {t2:.2f} Mbps  (cap 10 Mbps)")
@@ -371,6 +388,21 @@ def run_mptcp_baseline(h1, h2, tcp1, tcp2):
         ['Path 1 (10 Mbps)', 'Path 2 (10 Mbps)', 'Combined total'],
         'GRAPH — MPTCP aggregation baseline'
     )
+
+    try:
+        from plot_helpers import save_throughput_timeseries
+
+        save_throughput_timeseries(
+            {
+                "Path 1": bw1,
+                "Path 2": bw2,
+                "Combined": combined,
+            },
+            "Dual-path transfer (pre-collapse): throughput over time",
+            "fig04_mptcp_baseline_timeseries.png",
+        )
+    except ImportError:
+        print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
 
     efficiency = (t1 + t2) / (tcp1 + tcp2) * 100 if (tcp1 + tcp2) > 0 else 0
 
@@ -464,6 +496,27 @@ def run_collapse_experiment(net, h1, h2):
             'GRAPH — MPTCP during bandwidth collapse',
             collapse_at=COLLAPSE_AT
         )
+
+        try:
+            from plot_helpers import save_throughput_timeseries
+
+            save_throughput_timeseries(
+                {
+                    "Path 1 (stable 10 Mbps)": bw1,
+                    "Path 2 (throttled after event)": bw2,
+                    "Combined": combined,
+                },
+                "Bandwidth collapse on Path 2: throughput over time",
+                "fig04_bandwidth_collapse_timeseries.png",
+                vlines=[
+                    (
+                        float(COLLAPSE_AT + 1),
+                        "Path 2 throttled to 2 Mbps",
+                    )
+                ],
+            )
+        except ImportError:
+            print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
 
     # ── Summary ──
     banner("COLLAPSE EXPERIMENT SUMMARY")

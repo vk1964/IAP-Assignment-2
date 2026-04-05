@@ -301,6 +301,28 @@ def run_failure_experiment(net, h1, h2):
             print(f"  {i+1:>5}  {bw:>7.2f}  {bl:>7.2f}  {bc:>7.2f}   "
                   f"{bar:<24}  {note}")
 
+        try:
+            from plot_helpers import save_throughput_timeseries
+
+            # Printed table uses 1-based second index; link goes down after ~FAILURE_AT s.
+            save_throughput_timeseries(
+                {
+                    "Wi-Fi subflow (lost at failure)": wifi_padded,
+                    "LTE subflow (continues)": bw_lte,
+                    "Combined (session total)": combined,
+                },
+                "Path failure during dual-path transfer: throughput over time",
+                "fig03_path_failure_throughput.png",
+                vlines=[
+                    (
+                        float(FAILURE_AT + 1),
+                        "Wi-Fi path failure",
+                    )
+                ],
+            )
+        except ImportError:
+            print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
+
     # ── Summary ──
     banner("FAILURE EXPERIMENT SUMMARY")
 

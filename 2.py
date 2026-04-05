@@ -192,6 +192,26 @@ def run_tcp_baseline(h1, h2):
     print(f"  Combined theoretical    : {t1+t2:.2f} Mbps")
     print(f"{'='*55}\n")
 
+    try:
+        from plot_helpers import save_bar_comparison, save_throughput_timeseries
+
+        save_throughput_timeseries(
+            {
+                "TCP Path 1 (Wi-Fi)": bw1,
+                "TCP Path 2 (LTE)": bw2,
+            },
+            "TCP baseline: per-path throughput (independent TCP flows)",
+            "fig02_tcp_baseline_timeseries.png",
+        )
+        save_bar_comparison(
+            ["TCP Path 1", "TCP Path 2", "Sum (theoretical multihoming)"],
+            [t1, t2, t1 + t2],
+            "TCP baseline: average throughput (Mbps)",
+            "fig02_tcp_baseline_bars.png",
+        )
+    except ImportError:
+        print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
+
     # Wait for TCP TIME_WAIT connections to clear before MPTCP test
     print("  Waiting for TCP connections to clear (5s)...")
     time.sleep(5)
@@ -282,6 +302,32 @@ def run_mptcp_aggregation(h1, h2, tcp1, tcp2):
     else:
         print(f"  [!] Aggregation failed — check subflow setup")
     print(f"{'='*55}\n")
+
+    try:
+        from plot_helpers import save_grouped_bars, save_throughput_timeseries
+
+        series = {
+            "Subflow 1 (Wi-Fi path)": bw1,
+            "Subflow 2 (LTE path)": bw2,
+        }
+        if bw1 and bw2:
+            series["Combined (sum of subflows)"] = [
+                a + b for a, b in zip(bw1, bw2)
+            ]
+        save_throughput_timeseries(
+            series,
+            "Parallel streams over MPTCP endpoints: throughput over time",
+            "fig02_mptcp_parallel_streams_timeseries.png",
+        )
+        save_grouped_bars(
+            ["Path 1 (Wi-Fi)", "Path 2 (LTE)", "Combined"],
+            ["TCP baseline", "Parallel streams (MPTCP setup)"],
+            [[tcp1, tcp2, tcp1 + tcp2], [t1, t2, t1 + t2]],
+            "TCP baseline vs parallel dual-path transfer: average throughput",
+            "fig02_tcp_vs_mptcp_setup_bars.png",
+        )
+    except ImportError:
+        print("  [!] plot_helpers / matplotlib not available — skip PNG figures")
 
     h2.cmd('pkill -f iperf3')
 
