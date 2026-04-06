@@ -1,0 +1,5 @@
+\label{sec:future}
+
+\textbf{Competing-flow fairness.} The project brief also mentions fairness when multiple independent flows contend for the same paths. A natural extension is to add background \texttt{iperf3} or UDP cross-traffic and report Jain's fairness index or relative throughput ratios, optionally with a dedicated figure.
+
+\textbf{Other extensions.} Wire Experiment~6 to \texttt{plot\_helpers} for a publication-style time series. Compare additional kernel schedulers (\texttt{redundant}, \texttt{default}) side by side with \texttt{blest}. Longer runs with repeated handovers and explicit address handover signaling (\texttt{ip mptcp endpoint}) would tighten the mobility story. Adding ping or \texttt{ss -ti} statistics would connect throughput traces to measured RTT and retransmission behavior more directly.

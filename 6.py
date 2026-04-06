@@ -335,6 +335,35 @@ def run_handover_experiment(net, h1, h2):
         combined = [a + b for a, b in zip(bw1[:min(len(bw1), len(bw2))], bw2[:min(len(bw1), len(bw2))])]
         ascii_graph([bw1, bw2, combined], ['Path 1 (WiFi Degrading)', 'Path 2 (LTE Backup)', 'Total Throughput'], 'HANDOVER TRANSITION GRAPH', collapse_at=HANDOVER_AT)
 
+        try:
+            import os
+            os.environ.setdefault("MPTCP_REPORT_FIGS", "graphs")
+            from plot_helpers import save_bar_comparison, save_throughput_timeseries
+
+            mn = min(len(bw1), len(bw2))
+            b1, b2 = bw1[:mn], bw2[:mn]
+            comb = [a + b for a, b in zip(b1, b2)]
+            save_throughput_timeseries(
+                {
+                    "Path 1 (Wi-Fi analog, RTT ramped)": b1,
+                    "Path 2 (LTE analog)": b2,
+                    "Combined": comb,
+                },
+                "Handover: Path 1 RTT stepped up after t = 10 s (BLEST scheduler)",
+                "fig06_handover_timeseries.png",
+                vlines=[(10.5, "Handover (Path 1 delay increase)")],
+            )
+            pre = sum(comb[:HANDOVER_AT]) / HANDOVER_AT if HANDOVER_AT else 0.0
+            post = sum(comb[HANDOVER_AT:]) / max(len(comb) - HANDOVER_AT, 1)
+            save_bar_comparison(
+                ["Avg combined\nbefore t=10 s", "Avg combined\nafter handover"],
+                [pre, post],
+                "Handover: average combined throughput before vs. after event window",
+                "fig06_handover_pre_post_bars.png",
+            )
+        except ImportError:
+            print("  [!] plot_helpers / matplotlib not available — skip fig06 PNG figures")
+
     banner("HANDOVER SUCCESS METRICS")
     p1_pre = sum(bw1[:HANDOVER_AT]) / HANDOVER_AT
     p1_post = sum(bw1[HANDOVER_AT+2:]) / len(bw1[HANDOVER_AT+2:]) if len(bw1) > HANDOVER_AT+2 else 0

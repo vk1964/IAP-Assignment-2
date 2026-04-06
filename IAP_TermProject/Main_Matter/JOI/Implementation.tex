@@ -1,0 +1,27 @@
+\label{sec:implementation}
+
+All experiments are implemented as standalone Python scripts (\texttt{1.py}--\texttt{6.py}) in the assignment repository root. Scripts \texttt{1.py}--\texttt{5.py} share \texttt{plot\_helpers.py}, which writes PNG figures into \texttt{../graphs/} when Matplotlib is available. \texttt{6.py} currently emits ASCII plots and numeric tables to the console only (see \texttt{Outputs/6.txt}).
+
+\subsection{Mininet and links}
+We construct custom \texttt{Topo} subclasses and instantiate \texttt{Mininet(..., link=TCLink, switch=OVSBridge, controller=None)}. Per-link bandwidth (Mb/s) and delay strings follow Mininet's \texttt{TCLink} conventions; RTT is approximately twice the one-way delay plus switching overhead.
+
+\subsection{Experiment~\texttt{1.py}}
+Hosts receive static \texttt{/24} addresses on each subnet. \texttt{run\_tcp\_baseline} starts \texttt{iperf3 -s} on \texttt{h2}, then runs two sequential clients from \texttt{h1} to \texttt{10.0.1.2} and \texttt{10.0.2.2}. Results are parsed with \texttt{json.loads} from the client stdout.
+
+\subsection{Experiment~\texttt{2.py}}
+Adds policy routing tables and rules so traffic sourced from each local address exits the matching interface. Kernel MPTCP is enabled (\texttt{sysctl net.mptcp.enabled=1}), and \texttt{ip mptcp endpoint add ... dev ...} advertises addresses. Part~2 repeats per-path TCP baselines; Part~3 launches two clients to distinct server ports, bound per interface, and records \texttt{ss} lines for established flows during the transfer.
+
+\subsection{Experiment~\texttt{3.py}}
+Uses the same MPTCP-oriented addressing as Experiment~2. Two clients run for $30$~s. At $t=10$~s the receiver's Wi-Fi-side interface is brought down; the Wi-Fi client is killed so JSON may be partial while the LTE JSON completes.
+
+\subsection{Experiment~\texttt{4.py}}
+Symmetric $10$~Mb/s paths. Part~1--2 mirror baselines and dual-stream aggregation. Part~3 applies \texttt{tc qdisc replace ... tbf} (and related) on path~2 interfaces and switch ports at $t=10$~s to emulate collapse to $2$~Mb/s.
+
+\subsection{Experiment~\texttt{5.py}}
+Same symmetric topology as Experiment~4 for baselines. Part~3 runs TCP only on path~2. Part~4 runs dual streams. \texttt{tc netem} adds $\approx 800$~ms one-way delay per hop on path~2 at $t=10$~s, then restores baseline \texttt{netem} delay after the run.
+
+\subsection{Experiment~\texttt{6.py}}
+Dual path with Path~1 at $20$~ms per link hop and Path~2 at $50$~ms (both $10$~Mb/s). Sets \texttt{net.mptcp.scheduler=blest}, policy routing, and MPTCP endpoints as in other multipath scripts. Part~1--2: TCP baselines and $15$~s dual-stream aggregation. Part~3: $25$~s parallel streams with \texttt{degrade\_path1\_for\_handover} stepping Path~1 \texttt{netem} delay ($100$--$250$~ms targets) on \texttt{h1}/\texttt{h2} \texttt{eth0} and \texttt{s1} OVS ports after $t\approx 10$~s.
+
+\subsection{Reproducibility}
+Run each script with appropriate privileges (Mininet typically requires root). Capture console logs to the \texttt{Outputs/} text files referenced in Section~\ref{sec:results}. Regenerate figures by ensuring Python~3 dependencies in \texttt{requirements.txt} are installed.

@@ -1,0 +1,27 @@
+\label{sec:proposed_architecture}
+
+We follow a single evaluation pattern: deploy a two-path Mininet topology, configure addressing and routing, run \texttt{iperf3} clients and servers with \texttt{--json} and one-second intervals, parse interval throughput in megabits per second, and plot time series or bar summaries. Events are injected at a known time $t$ (typically $10$--$11$~s) so pre- and post-event windows are comparable.
+
+\subsection{Topology and addressing}
+Two Ethernet paths connect hosts \texttt{h1} and \texttt{h2}. Each host has two interfaces, each on a distinct subnet, emulating heterogeneous access (for example Wi-Fi-like vs.\ LTE-like, or two symmetric paths). Baseline TCP uses one destination IP at a time. Multipath experiments add a third ``logical'' subnet or use policy routing so replies exit the same interface that originated a subflow, which is required for correct subflow establishment.
+
+\subsection{Experiment~1: Independent TCP baselines}
+Run two sequential \texttt{iperf3} transfers from \texttt{h1} to \texttt{h2}, each bound to a single path, to establish per-path throughput near configured \texttt{TCLink} caps.
+
+\subsection{Experiment~2: Parallel streams and aggregation}
+After enabling MPTCP in the kernel and configuring endpoints, run \emph{two} concurrent \texttt{iperf3} clients, one bound to each interface, and compare the sum of average throughputs to the sum of the Experiment~1 TCP baselines. This measures how much capacity is usable when both paths are active simultaneously (aggregation), separate from single-socket MPTCP dynamics.
+
+\subsection{Experiment~3: Path failure}
+Start both parallel transfers for $30$~s. At $t=10$~s, administratively disable the receiver's interface on the first path (\texttt{ip link set} \ldots \texttt{down}), then terminate the corresponding client. The second stream continues, emulating sudden loss of one access network while the other remains.
+
+\subsection{Experiment~4: Bandwidth collapse}
+On a symmetric pair of $10$~Mb/s paths, run parallel streams for $25$~s. At $t=10$~s, reshape the second path to $2$~Mb/s using \texttt{tc} on host interfaces and switch ports. Record whether aggregate throughput is preserved by shifting load to the stable path.
+
+\subsection{Experiment~5: RTT spike}
+With two $10$~Mb/s paths and baseline RTT near $40$~ms, first run TCP only on the second path and inject a large one-way delay with \texttt{netem} at $t=10$~s (target RTT on the order of hundreds of milliseconds). Restore the link, then repeat under parallel two-path transfer. Compare single-path collapse to multipath resilience using combined throughput before and after the spike.
+
+\subsection{Experiment~6: Handover via primary-path RTT ramp}
+Two $10$~Mb/s paths with different baseline delays emulate a preferred fast path and a slower backup. After a dual-stream baseline, run parallel transfers for $25$~s and starting near $t=10$~s increase Path~1's delay in steps using \texttt{netem} on host interfaces and the Path~1 switch ports. The kernel MPTCP scheduler (we use \texttt{blest}) should prefer the lower-RTT path when possible and migrate traffic as Path~1 degrades. Outcomes are reported from \texttt{iperf3} interval sums and driver-computed before/after window averages (no separate PNG in our current pipeline).
+
+\subsection{Metrics}
+\textbf{Throughput} is taken from \texttt{iperf3} \texttt{end.sum\_received.bits\_per\_second} and per-interval arrays. \textbf{Session continuity} for path failure is evidenced by continued nonzero throughput on the surviving stream without restarting the server. \textbf{Resilience ratios} ``throughput retained (\%)'' are computed from average combined Mbps in defined pre- and post-event windows printed by our drivers. \textbf{Latency inflation} is imposed by \texttt{netem}; we interpret its effect indirectly via throughput and retransmissions rather than end-to-end RTT sampling in this report.

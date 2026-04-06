@@ -1,0 +1,17 @@
+\label{sec:intro}
+
+Mobile and multihomed hosts often see several access networks at once (for example Wi-Fi and cellular). Regular TCP binds a connection to a single four-tuple, so a change of interface or loss of that path can interrupt the application unless higher layers recover. Multipath TCP (MPTCP) extends TCP so one logical connection may use several \emph{subflows} across different paths, with the goal of higher throughput when paths add capacity and smoother handover when one path disappears~\cite{rfc8684,Bonaventure2012usecases}.
+
+This term project builds a small \emph{experimental framework} to compare baseline single-path TCP against a multipath-style setup under controlled link conditions. We use Mininet~\cite{Lantz2010mininet} with \texttt{TCLink} bandwidth and delay, Linux policy routing and kernel MPTCP endpoints where applicable, and \texttt{iperf3}~\cite{iperf3} with JSON output for throughput time series. Mobility-like events are \emph{emulated}: sudden interface down on one path, bandwidth collapse via \texttt{tc}, and RTT inflation via \texttt{netem}~\cite{linuxnetem}.
+
+\textbf{Objectives} (aligned with the course project brief):
+\begin{itemize}[noitemsep]
+  \item Quantify per-path and combined throughput under heterogeneous caps and delays.
+  \item Observe session continuity when one path is removed while traffic continues on another.
+  \item Stress one path with bandwidth collapse and RTT spikes and compare aggregate behavior to single-path TCP.
+  \item Discuss latency and scheduler effects qualitatively from throughput traces.
+  \item Study a handover-like scenario by ramping RTT on the preferred path while a second path stays available (Experiment~6).
+\end{itemize}
+\textbf{Competing-flow fairness} in the sense of multiple independent flows sharing the same paths (e.g., Jain fairness with cross-traffic) is \emph{not} measured here; Experiment~6 instead reports scheduler and throughput behavior under primary-path degradation.
+
+\textbf{Contributions of this report:} (i)~a reproducible Mininet-based workflow mapping six Python experiment drivers to measurement outputs; (ii)~numeric summaries from our captured logs (including tabular time-slice data where no figure is available); and (iii)~an honest discussion of limitations, including that our multipath measurements use parallel \texttt{iperf3} flows bound to interfaces as a practical stand-in for a single MPTCP socket in all scenarios.

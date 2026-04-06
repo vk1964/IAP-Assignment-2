@@ -1,0 +1,156 @@
+\pdfobjcompresslevel=0
+\pdfminorversion=4
+
+
+
+
+\documentclass[english,10pt]{article}
+\usepackage{graphicx}
+\usepackage{babel}
+\usepackage{graphics}
+\usepackage{setspace}
+\usepackage{paralist}
+\usepackage{psfrag}
+\usepackage{latexsym}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{amsfonts}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{epsfig}
+\usepackage{mathrsfs}
+\usepackage{geometry}
+\usepackage{rotating}
+\usepackage{subcaption}
+%ts_st
+% \usepackage{algorithm}
+%ts_end
+
+\usepackage{adjustbox}
+\usepackage[noend]{algpseudocode}
+\usepackage[hyphens]{url}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{tikz-cd}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{amsmath}
+%\usepackage[export]{adjustbox}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usepackage{tikz-cd}
+\usepackage{array}
+% ts_st
+% \usepackage{algorithm, algpseudocode}
+\usepackage{algorithm2e}
+%ts_end
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{footmisc}
+\usepackage{booktabs} % For formal tables
+\usepackage{todonotes}
+\usepackage{subcaption}
+\usepackage{colortbl}
+\usepackage{color}
+\usepackage{tcolorbox}
+\usepackage[hidelinks]{hyperref}
+
+\usepackage[numbers]{natbib}
+
+\newcommand{\citetest}[1]
+{\citeauthor{#1}\shortcite{#1}}
+\newcommand{\zij}{z_{ij}}
+\newcolumntype{M}[1]{>{\centering\arraybackslash}m{#1}}
+\newcolumntype{N}{@{}m{0pt}@{}}
+%\usepackage{csquotes}
+\usepackage{url}
+\usepackage{xkeyval}
+%ts_start
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{subcaption}
+\usepackage{rotating}
+\usepackage{pgfplots}
+%\usepackage[margin=3cm]{geometry}
+%ts_end
+%\usepackage{mdframed}
+\usepackage{booktabs} % For formal tables
+
+\PassOptionsToPackage{export}{adjustbox}
+
+\geometry{verbose,a4paper,tmargin=2.54cm,bmargin=2.54cm,lmargin=2.54cm,rmargin=2.54cm}
+\linespread{1.5}
+
+% Project figures live in Figures/; experiment plots are generated under ../graphs/
+\graphicspath{{Figures/}{../graphs/}}
+
+\begin{document}
+\input{Front_Matter/synopsis-titlepage.tex}
+\setcounter{page}{2}
+% \newpage
+% \input{Front_Matter/certificate.tex}
+% \newpage
+% \input{Front_Matter/acknowledgement.tex}
+
+\newpage
+\begin{singlespace}
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+% \listoftables
+% \newpage
+
+\section{Introduction}
+\input{Main_Matter/JOI/introduction}
+
+
+\section{Related Work}
+\input{Main_Matter/JOI/related_work}
+\section{Preliminaries and Core Idea}
+%\input{Main_Matter/JOI/preliminaries}
+%\section{Motivation}
+%\input{Main_Matter/JOI/motivation}
+
+\section{Proposed Methodology}
+\input{Main_Matter/JOI/proposed_architecture}
+\section{Implementation}
+\input{Main_Matter/JOI/Implementation}
+\section{Results and Discussions}
+\input{Main_Matter/JOI/results}
+
+
+\section{Conclusion}
+\input{Main_Matter/JOI/conclusion}
+\section{Future Work}
+\input{Main_Matter/JOI/future_work}
+\input{Main_Matter/JOI/references}
+\vspace{2mm}
+
+% \newpage
+
+% \subsection{Related Work}
+% \input{Main_Matter/JOI/Interoperability/interop_related_work}
+
+% \bibliographystyle{unsrt}
+% \bibliography{Main}
+
+%\normalsize
+
+%\newpage
+%\vspace{15 mm}
+%\noindent {\bf {\Huge APPENDICES}}
+
+%\appendix
+%\input{Main_Matter/Appendices/Appendix1.tex}
+
+%\newpage
+%\input{Appendix2.tex}
+\end{singlespace}
+\end{document}

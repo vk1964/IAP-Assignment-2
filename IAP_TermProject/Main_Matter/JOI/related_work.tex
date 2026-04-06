@@ -1,0 +1,5 @@
+\label{sec:related_work}
+
+Multipath TCP standardizes extensions to TCP so endpoints can advertise multiple addresses, add subflows, and schedule data across paths while presenting one byte stream to the application~\cite{rfc8684}. Early community discussion highlighted use cases such as smartphones combining Wi-Fi and cellular and the need for congestion control and fairness across coupled subflows~\cite{Bonaventure2012usecases}. Subsequent work has studied performance factors such as header compression interactions with multipath scheduling~\cite{Paasch2014experimental}.
+
+Our work is \emph{emulation-based} rather than wide-area deployment: we borrow the problem framing from the MPTCP literature but evaluate under synthetic topologies. Closely related systems work includes Mininet for repeatable SDN and end-host experiments~\cite{Lantz2010mininet}, \texttt{iperf3} for transport throughput~\cite{iperf3}, and Linux \texttt{tc}/\texttt{netem} for link impairment~\cite{linuxnetem}. These tools match the assignment's suggested stack (Mininet and/or Linux traffic control).
